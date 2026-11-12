@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smarter Dumb Washer",
+        "description": "Select the plug power sensor and the washer door sensor.",
+        "data": {
+          "power_sensor": "Power sensor",
+          "door_sensor": "Door sensor",
+          "start_power_threshold": "Start power threshold",
+          "idle_power_threshold": "Idle power threshold",
+          "end_delay": "End delay",
+          "min_cycle": "Minimum cycle",
+          "door_closed_start": "Require door closed to start"
+        },
+        "data_description": {
+          "power_sensor": "Smart plug power entity, in watts",
+          "door_sensor": "Washer door contact",
+          "start_power_threshold": "Power at or above this value starts a cycle",
+          "idle_power_threshold": "Power below this value can end a cycle. Must be below the start threshold",
+          "end_delay": "How long power must stay idle before the cycle ends",
+          "min_cycle": "Shorter runs are ignored",
+          "door_closed_start": "A cycle starts only while the door is closed"
+        }
+      }
+    },
+    "error": {
+      "same_entity": "Power sensor and door sensor must be different entities.",
+      "idle_not_below_start": "Idle power threshold must be below the start power threshold."
+    },
+    "abort": {
+      "already_configured": "This power sensor is already configured."
+    }
+  }
+}
