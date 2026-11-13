@@ -11,9 +11,16 @@ from .const import (
     CONF_MIN_CYCLE,
     CONF_POWER_SENSOR,
     CONF_START_THRESHOLD,
+    PROGRAM_UNKNOWN,
+    SAMPLE_SECONDS,
+    STAGE_UNKNOWN,
+    STATE_FINISHED,
+    STATE_IDLE,
+    STATE_RUNNING,
 )
 from .cycle_detector import CycleDetector
 from .learning import LearnSession
+from .matcher import LiveTrace, match_trace
 from .profile import build_program
 from .storage import ProgramStore
 
@@ -37,9 +44,13 @@ class WasherCoordinator:
         self._idle_threshold = data[CONF_IDLE_THRESHOLD]
         self.store = ProgramStore(hass, entry.entry_id)
         self.learner = LearnSession()
+        self._trace = LiveTrace()
+        self._match = None
+        self._matched_at = None
         self._listeners = set()
         self._unsub_state = None
         self._timer = None
+        self._match_timer = None
 
     @property
     def state(self):
@@ -53,6 +64,30 @@ class WasherCoordinator:
     def learning_program(self):
         return self.learner.program_name
 
+    @property
+    def program(self):
+        if self._match is None:
+            return PROGRAM_UNKNOWN
+        return self._match["program"]
+
+    @property
+    def stage(self):
+        if self._match is None:
+            return STAGE_UNKNOWN
+        return self._match["stage"]
+
+    @property
+    def progress(self):
+        if self._match is None:
+            return None
+        return self._match["progress"]
+
+    @property
+    def eta(self):
+        if self._match is None:
+            return None
+        return self._match["eta"]
+
     async def async_setup(self):
         await self.store.async_load()
         self._apply()
@@ -65,6 +100,7 @@ class WasherCoordinator:
             self._unsub_state()
             self._unsub_state = None
         self._cancel_timer()
+        self._cancel_match_timer()
 
     def async_add_listener(self, listener):
         self._listeners.add(listener)
@@ -85,6 +121,7 @@ class WasherCoordinator:
     async def async_delete_program(self, name):
         deleted = await self.store.async_delete(name)
         if deleted:
+            self._rematch()
             self._notify()
         return deleted
 
@@ -95,6 +132,7 @@ class WasherCoordinator:
             return "exists"
         if new_name != name:
             await self.store.async_rename(name, new_name)
+            self._rematch()
             self._notify()
         return "ok"
 
@@ -118,13 +156,19 @@ class WasherCoordinator:
             now,
         )
         finished = self.learner.observe(previous, self.detector.state, power, now)
+        match_before = self._match_key()
+        self._follow_cycle(previous, power, now)
         self._schedule(now)
         if finished is not None:
             name, samples = finished
             self.entry.async_create_task(
                 self.hass, self._async_store_program(name, samples)
             )
-        if self.detector.state != previous or self.learner.program_name != learning:
+        if (
+            self.detector.state != previous
+            or self.learner.program_name != learning
+            or self._match_key() != match_before
+        ):
             self._notify()
 
     async def _async_store_program(self, name, samples):
@@ -137,7 +181,60 @@ class WasherCoordinator:
         if program is None:
             return
         await self.store.async_put(program)
+        self._rematch()
         self._notify()
+
+    def _follow_cycle(self, previous, power, now):
+        state = self.detector.state
+        if state == STATE_RUNNING and previous != STATE_RUNNING:
+            self._trace.start(now, power)
+            self._match = None
+            self._matched_at = None
+            return
+        if state == STATE_RUNNING or (
+            previous == STATE_RUNNING and state == STATE_FINISHED
+        ):
+            changed = self._trace.append(now, power)
+            same_instant = (
+                self._matched_at is not None and abs(now - self._matched_at) < 0.001
+            )
+            self._maybe_match(
+                now, force=state == STATE_FINISHED or (changed and same_instant)
+            )
+            return
+        if state == STATE_IDLE and previous != STATE_IDLE:
+            self._trace.clear()
+            self._match = None
+            self._matched_at = None
+
+    def _maybe_match(self, now, force=False):
+        due = self._matched_at is None or now - self._matched_at >= SAMPLE_SECONDS
+        if not force and not due:
+            return
+        self._matched_at = now
+        self._match = self._score()
+
+    def _rematch(self):
+        if self.detector.state == STATE_IDLE or not self._trace.samples:
+            return
+        self._match = self._score()
+
+    def _score(self):
+        return match_trace(
+            self._trace.samples,
+            self.store.programs.values(),
+            self._idle_threshold,
+        )
+
+    def _match_key(self):
+        if self._match is None:
+            return None
+        return (
+            self._match["program"],
+            self._match["stage"],
+            self._match["progress"],
+            self._match["eta"],
+        )
 
     def _notify(self):
         for listener in list(self._listeners):
@@ -145,6 +242,7 @@ class WasherCoordinator:
 
     def _schedule(self, now):
         self._cancel_timer()
+        self._schedule_match(now)
         end_at = self.detector.end_check_at
         if end_at is None:
             return
@@ -153,11 +251,33 @@ class WasherCoordinator:
             delay = 1.0
         self._timer = async_call_later(self.hass, delay, self._on_timer)
 
+    def _schedule_match(self, now):
+        self._cancel_match_timer()
+        if self.detector.state != STATE_RUNNING:
+            return
+        delay = SAMPLE_SECONDS
+        if self._matched_at is not None:
+            delay = SAMPLE_SECONDS - (now - self._matched_at)
+            if delay < 1.0:
+                delay = SAMPLE_SECONDS
+        self._match_timer = async_call_later(self.hass, delay, self._on_match_timer)
+
+    @callback
+    def _on_match_timer(self, _now):
+        self._match_timer = None
+        self._apply()
+
     def _cancel_timer(self):
         if self._timer is None:
             return
         self._timer()
         self._timer = None
+
+    def _cancel_match_timer(self):
+        if self._match_timer is None:
+            return
+        self._match_timer()
+        self._match_timer = None
 
 
 def _power(state):

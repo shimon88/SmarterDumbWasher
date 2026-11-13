@@ -21,8 +21,7 @@ def build_program(name, samples, idle_threshold, existing=None):
     trimmed = trim_idle(samples, idle_threshold)
     if len(trimmed) < 2 or trimmed[-1][0] <= 0:
         return None
-    values, duration = resample(trimmed, SAMPLE_SECONDS)
-    values = smooth(values, _SMOOTH_WINDOW)
+    values, duration = grid_trace(trimmed)
     runs = 1
     stored = _stored_samples(existing)
     if stored is not None:
@@ -37,6 +36,11 @@ def build_program(name, samples, idle_threshold, existing=None):
         "stages": segment(values, duration),
         "runs": runs,
     }
+
+
+def grid_trace(samples):
+    values, duration = resample(samples, SAMPLE_SECONDS)
+    return smooth(values, _SMOOTH_WINDOW), duration
 
 
 def trim_idle(samples, idle_threshold):
