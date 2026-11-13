@@ -1,8 +1,14 @@
 import pytest
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.smarter_dumb_washer.const import (
     ATTR_ETA,
+    CONF_DOOR_CLOSED_START,
+    CONF_END_DELAY,
+    CONF_IDLE_THRESHOLD,
+    CONF_MIN_CYCLE,
+    CONF_START_THRESHOLD,
     ATTR_LEARNING,
     ATTR_NEW_NAME,
     ATTR_PROGRAM_NAME,
@@ -281,3 +287,49 @@ async def test_replay_reports_program_stage_and_progress(hass, washer_clock):
     assert washer_sensor(hass, entry, "progress").state == "100"
     assert washer_sensor(hass, entry, "stage").state == STAGE_SPIN
     assert washer_sensor(hass, entry, "program").state == "Quick"
+
+
+async def test_options_flow_reloads_shorter_cycle_limits(hass, washer_clock):
+    entry = await setup_washer(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == FlowResultType.FORM
+
+    rejected = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_START_THRESHOLD: 10,
+            CONF_IDLE_THRESHOLD: 10,
+            CONF_END_DELAY: 30,
+            CONF_MIN_CYCLE: 60,
+            CONF_DOOR_CLOSED_START: True,
+        },
+    )
+    assert rejected["type"] == FlowResultType.FORM
+    assert rejected["errors"]["base"] == "idle_not_below_start"
+
+    saved = await hass.config_entries.options.async_configure(
+        rejected["flow_id"],
+        {
+            CONF_START_THRESHOLD: 10,
+            CONF_IDLE_THRESHOLD: 2,
+            CONF_END_DELAY: 30,
+            CONF_MIN_CYCLE: 60,
+            CONF_DOOR_CLOSED_START: True,
+        },
+    )
+    assert saved["type"] == FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert entry.options[CONF_END_DELAY] == 30
+    assert entry.options[CONF_MIN_CYCLE] == 60
+
+    await play(
+        hass,
+        washer_clock,
+        [
+            (0, 0, True),
+            (1, 80, True),
+            (80, 1, True),
+            (120, 1, True),
+        ],
+    )
+    assert washer_state(hass, entry) == STATE_FINISHED

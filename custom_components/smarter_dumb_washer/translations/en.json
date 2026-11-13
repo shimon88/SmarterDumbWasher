@@ -32,6 +32,68 @@
       "already_configured": "This power sensor is already configured."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Washer options",
+        "description": "Saving reloads the washer. A cycle already running starts its trace over.",
+        "data": {
+          "start_power_threshold": "Start power threshold",
+          "idle_power_threshold": "Idle power threshold",
+          "end_delay": "End delay",
+          "min_cycle": "Minimum cycle",
+          "door_closed_start": "Require door closed to start"
+        },
+        "data_description": {
+          "start_power_threshold": "Power at or above this value starts a cycle",
+          "idle_power_threshold": "Power below this value can end a cycle. Must be below the start threshold",
+          "end_delay": "How long power must stay idle before the cycle ends",
+          "min_cycle": "Shorter runs are ignored",
+          "door_closed_start": "A cycle starts only while the door is closed"
+        }
+      }
+    },
+    "error": {
+      "idle_not_below_start": "Idle power threshold must be below the start power threshold."
+    }
+  },
+  "services": {
+    "learn_start": {
+      "name": "Start learning",
+      "description": "Arm learning. The next full wash cycle is stored under this name. The same name on a later cycle refines the saved program.",
+      "fields": {
+        "program_name": {
+          "name": "Program name",
+          "description": "Name to store this cycle under."
+        }
+      }
+    },
+    "learn_cancel": {
+      "name": "Cancel learning",
+      "description": "Disarm learning and drop the trace recorded so far."
+    },
+    "delete_program": {
+      "name": "Delete program",
+      "description": "Delete one learned program.",
+      "fields": {
+        "program_name": {
+          "name": "Program name"
+        }
+      }
+    },
+    "rename_program": {
+      "name": "Rename program",
+      "description": "Rename one learned program.",
+      "fields": {
+        "program_name": {
+          "name": "Program name"
+        },
+        "new_name": {
+          "name": "New name"
+        }
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "state": {
