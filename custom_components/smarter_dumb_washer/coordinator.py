@@ -18,6 +18,7 @@ from .const import (
     STATE_IDLE,
     STATE_RUNNING,
 )
+from .config_flow import configured_data
 from .cycle_detector import CycleDetector
 from .learning import LearnSession
 from .matcher import LiveTrace, match_trace
@@ -29,7 +30,7 @@ _MISSING = (STATE_UNKNOWN, STATE_UNAVAILABLE)
 
 class WasherCoordinator:
     def __init__(self, hass, entry):
-        data = entry.data
+        data = configured_data(entry)
         self.hass = hass
         self.entry = entry
         self.detector = CycleDetector(
