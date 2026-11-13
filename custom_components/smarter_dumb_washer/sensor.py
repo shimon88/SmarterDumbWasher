@@ -1,7 +1,14 @@
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN, STATE_FINISHED, STATE_IDLE, STATE_RUNNING
+from .const import (
+    ATTR_LEARNING,
+    ATTR_PROGRAMS,
+    DOMAIN,
+    STATE_FINISHED,
+    STATE_IDLE,
+    STATE_RUNNING,
+)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -32,3 +39,10 @@ class WasherStateSensor(SensorEntity):
     @property
     def native_value(self):
         return self.coordinator.state
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            ATTR_PROGRAMS: self.coordinator.program_names,
+            ATTR_LEARNING: self.coordinator.learning_program,
+        }

@@ -1,0 +1,59 @@
+learn_start:
+  name: Start learning
+  description: Arm learning. The next full wash cycle is stored under this name. The same name on a later cycle refines the saved program.
+  target:
+    entity:
+      integration: smarter_dumb_washer
+      domain: sensor
+  fields:
+    program_name:
+      name: Program name
+      description: Name to store this cycle under.
+      required: true
+      example: Cotton
+      selector:
+        text:
+
+learn_cancel:
+  name: Cancel learning
+  description: Disarm learning and drop the trace recorded so far.
+  target:
+    entity:
+      integration: smarter_dumb_washer
+      domain: sensor
+
+delete_program:
+  name: Delete program
+  description: Delete one learned program.
+  target:
+    entity:
+      integration: smarter_dumb_washer
+      domain: sensor
+  fields:
+    program_name:
+      name: Program name
+      required: true
+      example: Cotton
+      selector:
+        text:
+
+rename_program:
+  name: Rename program
+  description: Rename one learned program.
+  target:
+    entity:
+      integration: smarter_dumb_washer
+      domain: sensor
+  fields:
+    program_name:
+      name: Program name
+      required: true
+      example: Cotton
+      selector:
+        text:
+    new_name:
+      name: New name
+      required: true
+      example: Towels
+      selector:
+        text:

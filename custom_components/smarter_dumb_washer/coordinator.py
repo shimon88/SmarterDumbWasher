@@ -13,6 +13,9 @@ from .const import (
     CONF_START_THRESHOLD,
 )
 from .cycle_detector import CycleDetector
+from .learning import LearnSession
+from .profile import build_program
+from .storage import ProgramStore
 
 _MISSING = (STATE_UNKNOWN, STATE_UNAVAILABLE)
 
@@ -31,6 +34,9 @@ class WasherCoordinator:
         )
         self._power_id = data[CONF_POWER_SENSOR]
         self._door_id = data[CONF_DOOR_SENSOR]
+        self._idle_threshold = data[CONF_IDLE_THRESHOLD]
+        self.store = ProgramStore(hass, entry.entry_id)
+        self.learner = LearnSession()
         self._listeners = set()
         self._unsub_state = None
         self._timer = None
@@ -39,7 +45,16 @@ class WasherCoordinator:
     def state(self):
         return self.detector.state
 
+    @property
+    def program_names(self):
+        return sorted(self.store.programs)
+
+    @property
+    def learning_program(self):
+        return self.learner.program_name
+
     async def async_setup(self):
+        await self.store.async_load()
         self._apply()
         self._unsub_state = async_track_state_change_event(
             self.hass, [self._power_id, self._door_id], self._on_state
@@ -59,6 +74,30 @@ class WasherCoordinator:
 
         return _remove
 
+    def learn_start(self, name):
+        self.learner.start(name)
+        self._notify()
+
+    def learn_cancel(self):
+        self.learner.cancel()
+        self._notify()
+
+    async def async_delete_program(self, name):
+        deleted = await self.store.async_delete(name)
+        if deleted:
+            self._notify()
+        return deleted
+
+    async def async_rename_program(self, name, new_name):
+        if name not in self.store.programs:
+            return "missing"
+        if new_name != name and new_name in self.store.programs:
+            return "exists"
+        if new_name != name:
+            await self.store.async_rename(name, new_name)
+            self._notify()
+        return "ok"
+
     @callback
     def _on_state(self, _event):
         self._apply()
@@ -71,14 +110,36 @@ class WasherCoordinator:
     def _apply(self):
         now = dt_util.utcnow().timestamp()
         previous = self.detector.state
+        learning = self.learner.program_name
+        power = _power(self.hass.states.get(self._power_id))
         self.detector.update(
-            _power(self.hass.states.get(self._power_id)),
+            power,
             _door_closed(self.hass.states.get(self._door_id)),
             now,
         )
+        finished = self.learner.observe(previous, self.detector.state, power, now)
         self._schedule(now)
-        if self.detector.state == previous:
+        if finished is not None:
+            name, samples = finished
+            self.entry.async_create_task(
+                self.hass, self._async_store_program(name, samples)
+            )
+        if self.detector.state != previous or self.learner.program_name != learning:
+            self._notify()
+
+    async def _async_store_program(self, name, samples):
+        program = build_program(
+            name,
+            samples,
+            self._idle_threshold,
+            self.store.programs.get(name),
+        )
+        if program is None:
             return
+        await self.store.async_put(program)
+        self._notify()
+
+    def _notify(self):
         for listener in list(self._listeners):
             listener()
 
