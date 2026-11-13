@@ -16,6 +16,8 @@ Settings → Devices & services → Add integration → **Smarter Dumb Washer**.
 - **Door sensor** — washer door
 - Start threshold, idle threshold, end delay, minimum cycle, and whether the door must be closed to start
 
+A State sensor reports `idle`, `running`, or `finished`. Runs shorter than the minimum cycle are ignored. Opening the door after a finished cycle returns the sensor to `idle`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

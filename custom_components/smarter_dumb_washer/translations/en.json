@@ -31,5 +31,17 @@
     "abort": {
       "already_configured": "This power sensor is already configured."
     }
+  },
+  "entity": {
+    "sensor": {
+      "state": {
+        "name": "State",
+        "state": {
+          "idle": "Idle",
+          "running": "Running",
+          "finished": "Finished"
+        }
+      }
+    }
   }
 }
