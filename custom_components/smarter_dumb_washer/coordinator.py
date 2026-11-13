@@ -1,7 +1,7 @@
-import time
-
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_DOOR_CLOSED_START,
@@ -59,15 +59,17 @@ class WasherCoordinator:
 
         return _remove
 
+    @callback
     def _on_state(self, _event):
         self._apply()
 
+    @callback
     def _on_timer(self, _now):
         self._timer = None
         self._apply()
 
     def _apply(self):
-        now = time.monotonic()
+        now = dt_util.utcnow().timestamp()
         previous = self.detector.state
         self.detector.update(
             _power(self.hass.states.get(self._power_id)),
