@@ -33,5 +33,11 @@ STAGE_WASH = "wash"
 STAGE_HEAT = "heat"
 STAGE_RINSE = "rinse"
 STAGE_SPIN = "spin"
+STAGE_UNKNOWN = "unknown"
+
+PROGRAM_UNKNOWN = "unknown"
 
 SAMPLE_SECONDS = 10
+CONFIDENCE_MIN = 0.7
+
+ATTR_ETA = "eta"

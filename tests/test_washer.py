@@ -2,11 +2,13 @@ import pytest
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.smarter_dumb_washer.const import (
+    ATTR_ETA,
     ATTR_LEARNING,
     ATTR_NEW_NAME,
     ATTR_PROGRAM_NAME,
     ATTR_PROGRAMS,
     DOMAIN,
+    PROGRAM_UNKNOWN,
     SERVICE_DELETE_PROGRAM,
     SERVICE_LEARN_CANCEL,
     SERVICE_LEARN_START,
@@ -14,10 +16,12 @@ from custom_components.smarter_dumb_washer.const import (
     STAGE_FILL,
     STAGE_HEAT,
     STAGE_SPIN,
+    STAGE_UNKNOWN,
     STATE_FINISHED,
     STATE_IDLE,
     STATE_RUNNING,
 )
+from custom_components.smarter_dumb_washer.matcher import match_trace
 from custom_components.smarter_dumb_washer.profile import build_program
 
 from .traces import COTTON, NOISY, NORMAL, PAUSE, QUICK, SHORT
@@ -28,6 +32,7 @@ from .washer import (
     set_power,
     setup_washer,
     washer_attrs,
+    washer_sensor,
     washer_state,
 )
 
@@ -209,3 +214,70 @@ async def test_rename_delete_and_reload_program(hass, washer_clock):
         hass, entry, SERVICE_DELETE_PROGRAM, **{ATTR_PROGRAM_NAME: "Towels"}
     )
     assert washer_attrs(hass, entry)[ATTR_PROGRAMS] == []
+
+
+def _relative(trace):
+    points = [(stamp, watts) for stamp, watts, _door in trace if not (stamp == 0 and watts == 0)]
+    origin = points[0][0]
+    return [(stamp - origin, watts) for stamp, watts in points]
+
+
+def test_matcher_picks_the_closer_program():
+    cotton = build_program("Cotton", _relative(COTTON), 2)
+    quick = build_program("Quick", _relative(QUICK), 2)
+    programs = [cotton, quick]
+
+    assert match_trace(_relative(COTTON)[:1], programs, 2) is None
+
+    cotton_hit = match_trace(_relative(COTTON), programs, 2)
+    assert cotton_hit["program"] == "Cotton"
+    assert cotton_hit["stage"] == STAGE_SPIN
+    assert cotton_hit["progress"] == 100
+    assert cotton_hit["eta"] == 0
+
+    quick_hit = match_trace(_relative(QUICK), programs, 2)
+    assert quick_hit["program"] == "Quick"
+    assert quick_hit["stage"] == STAGE_SPIN
+    assert quick_hit["progress"] == 100
+
+
+async def test_replay_reports_program_stage_and_progress(hass, washer_clock):
+    entry = await setup_washer(hass)
+    await call_washer(hass, entry, SERVICE_LEARN_START, **{ATTR_PROGRAM_NAME: "Cotton"})
+    await play(hass, washer_clock, COTTON)
+
+    assert washer_sensor(hass, entry, "program").state == "Cotton"
+    assert washer_sensor(hass, entry, "stage").state == STAGE_SPIN
+    assert washer_sensor(hass, entry, "progress").state == "100"
+    assert washer_sensor(hass, entry, "progress").attributes[ATTR_ETA] == 0
+
+    set_door(hass, False)
+    await hass.async_block_till_done()
+    assert washer_sensor(hass, entry, "program").state == PROGRAM_UNKNOWN
+    assert washer_sensor(hass, entry, "stage").state == STAGE_UNKNOWN
+    assert washer_sensor(hass, entry, "progress").state == "unknown"
+
+    washer_clock.origin = washer_clock.when
+    set_door(hass, True)
+    await call_washer(hass, entry, SERVICE_LEARN_START, **{ATTR_PROGRAM_NAME: "Quick"})
+    await play(hass, washer_clock, QUICK)
+    assert washer_sensor(hass, entry, "program").state == "Quick"
+
+    set_door(hass, False)
+    await hass.async_block_till_done()
+    washer_clock.origin = washer_clock.when
+    set_door(hass, True)
+    await play(hass, washer_clock, QUICK[:4])
+
+    assert washer_state(hass, entry) == STATE_RUNNING
+    assert washer_sensor(hass, entry, "program").state == "Quick"
+    progress = int(washer_sensor(hass, entry, "progress").state)
+    assert 0 < progress < 100
+    assert washer_sensor(hass, entry, "stage").state == STAGE_SPIN
+    assert washer_sensor(hass, entry, "progress").attributes[ATTR_ETA] > 0
+
+    await play(hass, washer_clock, QUICK[4:])
+    assert int(washer_sensor(hass, entry, "progress").state) >= progress
+    assert washer_sensor(hass, entry, "progress").state == "100"
+    assert washer_sensor(hass, entry, "stage").state == STAGE_SPIN
+    assert washer_sensor(hass, entry, "program").state == "Quick"

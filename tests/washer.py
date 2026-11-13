@@ -104,6 +104,16 @@ def washer_state(hass, entry):
     return state.state
 
 
+def washer_sensor(hass, entry, key):
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}-{key}"
+    )
+    assert entity_id is not None
+    state = hass.states.get(entity_id)
+    assert state is not None
+    return state
+
+
 def washer_attrs(hass, entry):
     state = hass.states.get(washer_entity_id(hass, entry))
     assert state is not None

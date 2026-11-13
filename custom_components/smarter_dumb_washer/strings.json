@@ -41,6 +41,23 @@
           "running": "Running",
           "finished": "Finished"
         }
+      },
+      "program": {
+        "name": "Program"
+      },
+      "stage": {
+        "name": "Stage",
+        "state": {
+          "unknown": "Unknown",
+          "fill": "Fill",
+          "wash": "Wash",
+          "heat": "Heat",
+          "rinse": "Rinse",
+          "spin": "Spin"
+        }
+      },
+      "progress": {
+        "name": "Progress"
       }
     }
   }
