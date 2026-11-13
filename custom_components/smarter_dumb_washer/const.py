@@ -17,3 +17,21 @@ DEFAULT_DOOR_CLOSED_START = True
 STATE_IDLE = "idle"
 STATE_RUNNING = "running"
 STATE_FINISHED = "finished"
+
+SERVICE_LEARN_START = "learn_start"
+SERVICE_LEARN_CANCEL = "learn_cancel"
+SERVICE_DELETE_PROGRAM = "delete_program"
+SERVICE_RENAME_PROGRAM = "rename_program"
+
+ATTR_PROGRAM_NAME = "program_name"
+ATTR_NEW_NAME = "new_name"
+ATTR_PROGRAMS = "programs"
+ATTR_LEARNING = "learning"
+
+STAGE_FILL = "fill"
+STAGE_WASH = "wash"
+STAGE_HEAT = "heat"
+STAGE_RINSE = "rinse"
+STAGE_SPIN = "spin"
+
+SAMPLE_SECONDS = 10

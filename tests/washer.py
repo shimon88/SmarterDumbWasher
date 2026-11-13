@@ -90,10 +90,30 @@ async def play(hass, clock, samples):
         await hass.async_block_till_done()
 
 
-def washer_state(hass, entry):
+def washer_entity_id(hass, entry):
     entity_id = er.async_get(hass).async_get_entity_id(
         "sensor", DOMAIN, f"{entry.entry_id}-state"
     )
-    state = hass.states.get(entity_id)
+    assert entity_id is not None
+    return entity_id
+
+
+def washer_state(hass, entry):
+    state = hass.states.get(washer_entity_id(hass, entry))
     assert state is not None
     return state.state
+
+
+def washer_attrs(hass, entry):
+    state = hass.states.get(washer_entity_id(hass, entry))
+    assert state is not None
+    return state.attributes
+
+
+async def call_washer(hass, entry, service, **data):
+    await hass.services.async_call(
+        DOMAIN,
+        service,
+        {"entity_id": washer_entity_id(hass, entry), **data},
+        blocking=True,
+    )
