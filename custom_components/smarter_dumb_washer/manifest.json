@@ -1,12 +1,12 @@
 {
   "domain": "smarter_dumb_washer",
   "name": "Smarter Dumb Washer",
-  "codeowners": ["@shimon88"],
   "categories": [
     "appliances_cleaning.laundry",
     "helpers.calculate_value",
     "energy.meters_monitoring"
   ],
+  "codeowners": ["@shimon88"],
   "config_flow": true,
   "documentation": "https://github.com/shimon88/SmarterDumbWasher",
   "integration_type": "helper",
