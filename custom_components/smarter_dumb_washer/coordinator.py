@@ -1,4 +1,7 @@
+import logging
+
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.util import dt as dt_util
@@ -11,6 +14,9 @@ from .const import (
     CONF_MIN_CYCLE,
     CONF_POWER_SENSOR,
     CONF_START_THRESHOLD,
+    LEARN_EMPTY,
+    LEARN_STORED,
+    LEARN_TOO_SHORT,
     PROGRAM_UNKNOWN,
     SAMPLE_SECONDS,
     STAGE_UNKNOWN,
@@ -25,6 +31,7 @@ from .matcher import LiveTrace, match_trace
 from .profile import build_program
 from .storage import ProgramStore
 
+_LOGGER = logging.getLogger(__name__)
 _MISSING = (STATE_UNKNOWN, STATE_UNAVAILABLE)
 
 
@@ -46,6 +53,10 @@ class WasherCoordinator:
         self.store = ProgramStore(hass, entry.entry_id)
         self.learner = LearnSession()
         self._trace = LiveTrace()
+        self.learn_result = None
+        self.learn_result_program = None
+        self.draft_name = ""
+        self.selected_program = None
         self._match = None
         self._matched_at = None
         self._listeners = set()
@@ -64,6 +75,14 @@ class WasherCoordinator:
     @property
     def learning_program(self):
         return self.learner.program_name
+
+    @property
+    def learn_status(self):
+        return self.learner.status
+
+    @property
+    def learn_samples(self):
+        return self.learner.samples
 
     @property
     def program(self):
@@ -119,6 +138,44 @@ class WasherCoordinator:
         self.learner.cancel()
         self._notify()
 
+    def set_draft_name(self, name):
+        self.draft_name = str(name).strip()
+        self._notify()
+
+    def select_program(self, name):
+        if name not in self.store.programs:
+            raise ServiceValidationError(f"Unknown program {name}")
+        self.selected_program = name
+        self._notify()
+
+    def press_learn_start(self):
+        if not self.draft_name:
+            raise ServiceValidationError("Program name is empty")
+        self.learn_start(self.draft_name)
+
+    async def press_delete_program(self):
+        name = self.selected_program
+        if not name:
+            raise ServiceValidationError("Select a learned program first")
+        if not await self.async_delete_program(name):
+            raise ServiceValidationError(f"Unknown program {name}")
+        self.selected_program = None
+        self._notify()
+
+    async def press_rename_program(self):
+        name = self.selected_program
+        if not name:
+            raise ServiceValidationError("Select a learned program first")
+        if not self.draft_name:
+            raise ServiceValidationError("Program name is empty")
+        result = await self.async_rename_program(name, self.draft_name)
+        if result == "missing":
+            raise ServiceValidationError(f"Unknown program {name}")
+        if result == "exists":
+            raise ServiceValidationError(f"Program {self.draft_name} already exists")
+        self.selected_program = self.draft_name
+        self._notify()
+
     async def async_delete_program(self, name):
         deleted = await self.store.async_delete(name)
         if deleted:
@@ -149,7 +206,7 @@ class WasherCoordinator:
     def _apply(self):
         now = dt_util.utcnow().timestamp()
         previous = self.detector.state
-        learning = self.learner.program_name
+        learning = (self.learner.status, self.learn_result, self.learn_result_program)
         power = _power(self.hass.states.get(self._power_id))
         self.detector.update(
             power,
@@ -161,13 +218,21 @@ class WasherCoordinator:
         self._follow_cycle(previous, power, now)
         self._schedule(now)
         if finished is not None:
-            name, samples = finished
-            self.entry.async_create_task(
-                self.hass, self._async_store_program(name, samples)
-            )
+            kind, name, samples = finished
+            if kind == LEARN_TOO_SHORT:
+                self._remember_learn(LEARN_TOO_SHORT, name)
+                _LOGGER.info(
+                    "Ignored learn cycle for %s: shorter than the minimum cycle",
+                    name,
+                )
+            else:
+                self.entry.async_create_task(
+                    self.hass, self._async_store_program(name, samples)
+                )
         if (
             self.detector.state != previous
-            or self.learner.program_name != learning
+            or (self.learner.status, self.learn_result, self.learn_result_program)
+            != learning
             or self._match_key() != match_before
         ):
             self._notify()
@@ -180,10 +245,19 @@ class WasherCoordinator:
             self.store.programs.get(name),
         )
         if program is None:
+            self._remember_learn(LEARN_EMPTY, name)
+            _LOGGER.info("Learn cycle for %s had no usable power trace", name)
+            self._notify()
             return
         await self.store.async_put(program)
+        self._remember_learn(LEARN_STORED, name)
+        _LOGGER.info("Stored program %s from %s runs", name, program["runs"])
         self._rematch()
         self._notify()
+
+    def _remember_learn(self, result, name):
+        self.learn_result = result
+        self.learn_result_program = name
 
     def _follow_cycle(self, previous, power, now):
         state = self.detector.state

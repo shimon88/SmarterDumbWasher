@@ -1,4 +1,12 @@
-from .const import STATE_FINISHED, STATE_IDLE, STATE_RUNNING
+from .const import (
+    LEARN_IDLE,
+    LEARN_RECORDING,
+    LEARN_TOO_SHORT,
+    LEARN_WAITING,
+    STATE_FINISHED,
+    STATE_IDLE,
+    STATE_RUNNING,
+)
 
 
 class LearnSession:
@@ -7,6 +15,18 @@ class LearnSession:
         self._recording = False
         self._origin = None
         self._samples = []
+
+    @property
+    def status(self):
+        if self.program_name is None:
+            return LEARN_IDLE
+        if self._recording:
+            return LEARN_RECORDING
+        return LEARN_WAITING
+
+    @property
+    def samples(self):
+        return len(self._samples)
 
     def start(self, name):
         self.program_name = name
@@ -33,9 +53,11 @@ class LearnSession:
             name = self.program_name
             samples = list(self._samples)
             self.cancel()
-            return name, samples
+            return "finished", name, samples
         if state == STATE_IDLE:
+            name = self.program_name
             self._stop_recording()
+            return LEARN_TOO_SHORT, name, None
         return None
 
     def _append(self, moment, power):

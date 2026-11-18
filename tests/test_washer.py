@@ -13,7 +13,14 @@ from custom_components.smarter_dumb_washer.const import (
     ATTR_NEW_NAME,
     ATTR_PROGRAM_NAME,
     ATTR_PROGRAMS,
+    ATTR_LAST_PROGRAM,
+    ATTR_LAST_RESULT,
     DOMAIN,
+    LEARN_IDLE,
+    LEARN_RECORDING,
+    LEARN_STORED,
+    LEARN_TOO_SHORT,
+    LEARN_WAITING,
     PROGRAM_UNKNOWN,
     SERVICE_DELETE_PROGRAM,
     SERVICE_LEARN_CANCEL,
@@ -38,6 +45,7 @@ from .washer import (
     set_power,
     setup_washer,
     washer_attrs,
+    washer_entity,
     washer_sensor,
     washer_state,
 )
@@ -142,13 +150,21 @@ async def test_learn_cycle_stores_program(hass, washer_clock):
     entry = await setup_washer(hass)
     await call_washer(hass, entry, SERVICE_LEARN_START, **{ATTR_PROGRAM_NAME: "Cotton"})
     assert washer_attrs(hass, entry)[ATTR_LEARNING] == "Cotton"
+    assert washer_sensor(hass, entry, "learning").state == LEARN_WAITING
 
-    await play(hass, washer_clock, COTTON)
+    await play(hass, washer_clock, COTTON[:3])
+    assert washer_sensor(hass, entry, "learning").state == LEARN_RECORDING
+
+    await play(hass, washer_clock, COTTON[3:])
 
     assert washer_state(hass, entry) == STATE_FINISHED
     attrs = washer_attrs(hass, entry)
     assert attrs[ATTR_PROGRAMS] == ["Cotton"]
     assert attrs[ATTR_LEARNING] is None
+    learning = washer_sensor(hass, entry, "learning")
+    assert learning.state == LEARN_IDLE
+    assert learning.attributes[ATTR_LAST_RESULT] == LEARN_STORED
+    assert learning.attributes[ATTR_LAST_PROGRAM] == "Cotton"
     program = entry.runtime_data.store.programs["Cotton"]
     names = [stage["name"] for stage in program["stages"]]
     assert names[0] == STAGE_FILL
@@ -188,6 +204,10 @@ async def test_cancel_and_short_cycle_do_not_store(hass, washer_clock):
     assert washer_state(hass, entry) == STATE_IDLE
     assert washer_attrs(hass, entry)[ATTR_LEARNING] == "Quick"
     assert washer_attrs(hass, entry)[ATTR_PROGRAMS] == []
+    learning = washer_sensor(hass, entry, "learning")
+    assert learning.state == LEARN_WAITING
+    assert learning.attributes[ATTR_LAST_RESULT] == LEARN_TOO_SHORT
+    assert learning.attributes[ATTR_LAST_PROGRAM] == "Quick"
 
 
 async def test_rename_delete_and_reload_program(hass, washer_clock):
@@ -333,3 +353,59 @@ async def test_options_flow_reloads_shorter_cycle_limits(hass, washer_clock):
         ],
     )
     assert washer_state(hass, entry) == STATE_FINISHED
+
+
+async def test_device_controls_learn_rename_delete(hass, washer_clock):
+    entry = await setup_washer(hass)
+    name = washer_entity(hass, entry, "text", "program-name")
+    start = washer_entity(hass, entry, "button", "start-learning")
+    cancel = washer_entity(hass, entry, "button", "cancel-learning")
+    delete = washer_entity(hass, entry, "button", "delete-program")
+    rename = washer_entity(hass, entry, "button", "rename-program")
+    learned = washer_entity(hass, entry, "select", "learned-program")
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": start}, blocking=True
+        )
+
+    await hass.services.async_call(
+        "text", "set_value", {"entity_id": name, "value": "Cotton"}, blocking=True
+    )
+    await hass.services.async_call(
+        "button", "press", {"entity_id": start}, blocking=True
+    )
+    assert washer_sensor(hass, entry, "learning").state == LEARN_WAITING
+
+    await hass.services.async_call(
+        "button", "press", {"entity_id": cancel}, blocking=True
+    )
+    assert washer_sensor(hass, entry, "learning").state == LEARN_IDLE
+
+    await hass.services.async_call(
+        "button", "press", {"entity_id": start}, blocking=True
+    )
+    await play(hass, washer_clock, COTTON)
+    assert (
+        washer_sensor(hass, entry, "learning").attributes[ATTR_LAST_RESULT]
+        == LEARN_STORED
+    )
+
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": learned, "option": "Cotton"},
+        blocking=True,
+    )
+    await hass.services.async_call(
+        "text", "set_value", {"entity_id": name, "value": "Whites"}, blocking=True
+    )
+    await hass.services.async_call(
+        "button", "press", {"entity_id": rename}, blocking=True
+    )
+    assert washer_attrs(hass, entry)[ATTR_PROGRAMS] == ["Whites"]
+
+    await hass.services.async_call(
+        "button", "press", {"entity_id": delete}, blocking=True
+    )
+    assert washer_attrs(hass, entry)[ATTR_PROGRAMS] == []

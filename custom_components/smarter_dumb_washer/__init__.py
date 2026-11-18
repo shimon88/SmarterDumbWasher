@@ -6,7 +6,7 @@ from .const import DOMAIN
 from .coordinator import WasherCoordinator
 from .services import async_setup_services, async_unload_services
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BUTTON, Platform.TEXT, Platform.SELECT]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
