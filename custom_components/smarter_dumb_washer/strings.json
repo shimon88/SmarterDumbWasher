@@ -104,6 +104,14 @@
           "finished": "Finished"
         }
       },
+      "learning": {
+        "name": "Learning",
+        "state": {
+          "idle": "Idle",
+          "waiting": "Waiting for the next cycle",
+          "recording": "Recording"
+        }
+      },
       "program": {
         "name": "Program"
       },
@@ -120,6 +128,30 @@
       },
       "progress": {
         "name": "Progress"
+      }
+    },
+    "button": {
+      "start_learning": {
+        "name": "Start learning"
+      },
+      "cancel_learning": {
+        "name": "Cancel learning"
+      },
+      "delete_program": {
+        "name": "Delete program"
+      },
+      "rename_program": {
+        "name": "Rename program"
+      }
+    },
+    "text": {
+      "program_name": {
+        "name": "Program name"
+      }
+    },
+    "select": {
+      "learned_program": {
+        "name": "Learned program"
       }
     }
   }

@@ -27,6 +27,18 @@ ATTR_PROGRAM_NAME = "program_name"
 ATTR_NEW_NAME = "new_name"
 ATTR_PROGRAMS = "programs"
 ATTR_LEARNING = "learning"
+ATTR_LEARN_PROGRAM = "program"
+ATTR_SAMPLES = "samples"
+ATTR_LAST_RESULT = "last_result"
+ATTR_LAST_PROGRAM = "last_program"
+
+LEARN_IDLE = "idle"
+LEARN_WAITING = "waiting"
+LEARN_RECORDING = "recording"
+
+LEARN_STORED = "stored"
+LEARN_TOO_SHORT = "too_short"
+LEARN_EMPTY = "empty"
 
 STAGE_FILL = "fill"
 STAGE_WASH = "wash"

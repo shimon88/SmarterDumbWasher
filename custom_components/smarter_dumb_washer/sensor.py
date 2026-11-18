@@ -4,9 +4,16 @@ from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
     ATTR_ETA,
+    ATTR_LAST_PROGRAM,
+    ATTR_LAST_RESULT,
     ATTR_LEARNING,
+    ATTR_LEARN_PROGRAM,
     ATTR_PROGRAMS,
+    ATTR_SAMPLES,
     DOMAIN,
+    LEARN_IDLE,
+    LEARN_RECORDING,
+    LEARN_WAITING,
     STAGE_FILL,
     STAGE_HEAT,
     STAGE_RINSE,
@@ -24,6 +31,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(
         [
             WasherStateSensor(coordinator),
+            WasherLearningSensor(coordinator),
             WasherProgramSensor(coordinator),
             WasherStageSensor(coordinator),
             WasherProgressSensor(coordinator),
@@ -67,6 +75,29 @@ class WasherStateSensor(_WasherSensor):
         return {
             ATTR_PROGRAMS: self.coordinator.program_names,
             ATTR_LEARNING: self.coordinator.learning_program,
+        }
+
+
+class WasherLearningSensor(_WasherSensor):
+    _attr_translation_key = "learning"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [LEARN_IDLE, LEARN_WAITING, LEARN_RECORDING]
+    _attr_icon = "mdi:book-open-variant"
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator, "learning")
+
+    @property
+    def native_value(self):
+        return self.coordinator.learn_status
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            ATTR_LEARN_PROGRAM: self.coordinator.learning_program,
+            ATTR_SAMPLES: self.coordinator.learn_samples,
+            ATTR_LAST_RESULT: self.coordinator.learn_result,
+            ATTR_LAST_PROGRAM: self.coordinator.learn_result_program,
         }
 
 

@@ -33,7 +33,17 @@ Runs shorter than the minimum cycle are ignored. Opening the door after a finish
 
 ## Learn a program
 
-Call the services on the State sensor (or any sensor from this device).
+On the device page:
+
+1. Type a name in **Program name**.
+2. Press **Start learning**. **Learning** changes to `waiting`, then `recording` when the next cycle starts.
+3. Run that wash. When it finishes, **Learning** returns to `idle` and `last_result` is `stored`. The name appears in **Learned program**.
+4. **Cancel learning** drops a recording in progress.
+5. Choose a saved name in **Learned program**. **Delete program** removes it. Type a new name and press **Rename program** to rename the selected one.
+
+`last_result` is `too_short` when the run is under the minimum cycle, and `empty` when the trace cannot be stored. Learning stays `waiting` after a short run so you can try again.
+
+The same actions exist as services if you want an automation:
 
 1. **Start learning** with a program name. The next full cycle is recorded.
 2. Close the door and run that wash. When power stays under the idle threshold for the end delay, the trace is stored.
