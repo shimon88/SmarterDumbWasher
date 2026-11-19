@@ -9,9 +9,9 @@
   "codeowners": ["@shimon88"],
   "config_flow": true,
   "documentation": "https://github.com/shimon88/SmarterDumbWasher",
-  "integration_type": "helper",
+  "integration_type": "device",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/shimon88/SmarterDumbWasher/issues",
   "requirements": [],
-  "version": "0.2.1"
+  "version": "0.2.2"
 }
