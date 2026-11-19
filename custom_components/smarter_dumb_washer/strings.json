@@ -16,7 +16,7 @@
         "data_description": {
           "power_sensor": "Smart plug power entity, in watts",
           "door_sensor": "Washer door contact",
-          "start_power_threshold": "Power at or above this value starts a cycle",
+          "start_power_threshold": "A cycle starts when average power over 20 seconds reaches this value, or 20 W if this is lower",
           "idle_power_threshold": "Power below this value can end a cycle. Must be below the start threshold",
           "end_delay": "How long power must stay idle before the cycle ends",
           "min_cycle": "Shorter runs are ignored",
@@ -45,7 +45,7 @@
           "door_closed_start": "Require door closed to start"
         },
         "data_description": {
-          "start_power_threshold": "Power at or above this value starts a cycle",
+          "start_power_threshold": "A cycle starts when average power over 20 seconds reaches this value, or 20 W if this is lower",
           "idle_power_threshold": "Power below this value can end a cycle. Must be below the start threshold",
           "end_delay": "How long power must stay idle before the cycle ends",
           "min_cycle": "Shorter runs are ignored",
@@ -100,6 +100,7 @@
         "name": "State",
         "state": {
           "idle": "Idle",
+          "on": "On",
           "running": "Running",
           "finished": "Finished"
         }

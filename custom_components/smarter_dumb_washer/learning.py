@@ -36,13 +36,15 @@ class LearnSession:
         self.program_name = None
         self._stop_recording()
 
-    def observe(self, previous, state, power, now):
+    def observe(self, previous, state, power, now, prelude=()):
         if self.program_name is None:
             return None
         if state == STATE_RUNNING and previous != STATE_RUNNING:
             self._recording = True
-            self._origin = now
+            self._origin = prelude[0][0] if prelude else now
             self._samples = []
+            for moment, watts in prelude:
+                self._append(moment - self._origin, watts)
         if self._recording and power is not None and (
             state == STATE_RUNNING or previous == STATE_RUNNING
         ):
