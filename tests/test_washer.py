@@ -1,6 +1,9 @@
+from datetime import timedelta
+
 import pytest
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.smarter_dumb_washer.const import (
     ATTR_ETA,
@@ -32,6 +35,7 @@ from custom_components.smarter_dumb_washer.const import (
     STAGE_UNKNOWN,
     STATE_FINISHED,
     STATE_IDLE,
+    STATE_MACHINE_ON,
     STATE_RUNNING,
 )
 from custom_components.smarter_dumb_washer.matcher import match_trace
@@ -110,11 +114,45 @@ async def test_open_door_blocks_start(hass, washer_clock):
 
     set_power(hass, 80)
     await hass.async_block_till_done()
-    assert washer_state(hass, entry) == STATE_IDLE
+    assert washer_state(hass, entry) == STATE_MACHINE_ON
 
     set_door(hass, True)
     await hass.async_block_till_done()
+    assert washer_state(hass, entry) == STATE_MACHINE_ON
+
+    washer_clock.when += timedelta(seconds=20)
+    async_fire_time_changed(hass, washer_clock.when)
+    await hass.async_block_till_done()
     assert washer_state(hass, entry) == STATE_RUNNING
+
+
+async def test_power_on_spike_does_not_block_learning(hass, washer_clock):
+    entry = await setup_washer(hass)
+    await play(
+        hass,
+        washer_clock,
+        [
+            (0, 1, True),
+            (1, 50, True),
+            (3, 8, True),
+            (30, 8, True),
+        ],
+    )
+    assert washer_state(hass, entry) == STATE_MACHINE_ON
+
+    await call_washer(hass, entry, SERVICE_LEARN_START, **{ATTR_PROGRAM_NAME: "Mix"})
+    assert washer_sensor(hass, entry, "learning").state == LEARN_WAITING
+
+    await play(
+        hass,
+        washer_clock,
+        [
+            (30 + second, 80 if second % 2 == 0 else 12, True)
+            for second in range(25)
+        ],
+    )
+    assert washer_state(hass, entry) == STATE_RUNNING
+    assert washer_sensor(hass, entry, "learning").state == LEARN_RECORDING
 
 
 async def test_unload_removes_state_sensor(hass, washer_clock):

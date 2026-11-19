@@ -22,6 +22,7 @@ from .const import (
     STAGE_WASH,
     STATE_FINISHED,
     STATE_IDLE,
+    STATE_MACHINE_ON,
     STATE_RUNNING,
 )
 
@@ -60,7 +61,7 @@ class _WasherSensor(SensorEntity):
 class WasherStateSensor(_WasherSensor):
     _attr_translation_key = "state"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = [STATE_IDLE, STATE_RUNNING, STATE_FINISHED]
+    _attr_options = [STATE_IDLE, STATE_MACHINE_ON, STATE_RUNNING, STATE_FINISHED]
     _attr_icon = "mdi:washing-machine"
 
     def __init__(self, coordinator):

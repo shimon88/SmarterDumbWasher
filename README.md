@@ -24,12 +24,12 @@ Change those thresholds later under the device's **Configure** button. Saving re
 
 | Sensor | Values |
 | --- | --- |
-| State | `idle`, `running`, `finished` |
+| State | `idle`, `on`, `running`, `finished` |
 | Program | Learned name, or `unknown` until the live trace matches |
 | Stage | `fill`, `wash`, `heat`, `rinse`, `spin`, or `unknown` |
 | Progress | Percent through the matched program. Attribute `eta` is the remaining seconds |
 
-Runs shorter than the minimum cycle are ignored. Opening the door after a finished cycle returns State to `idle` and clears the match. The State sensor attributes `programs` and `learning` list saved names and the program currently being learned.
+`on` means the machine is powered. `running` starts only after average power stays at or above 20 W, or your start threshold if that is higher, for 20 seconds. Turning the machine on does not start a cycle. Runs shorter than the minimum cycle are ignored. Opening the door after a finished cycle returns State to `idle` and clears the match. The State sensor attributes `programs` and `learning` list saved names and the program currently being learned.
 
 ## Learn a program
 

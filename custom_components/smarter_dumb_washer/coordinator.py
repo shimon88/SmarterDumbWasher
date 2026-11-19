@@ -213,9 +213,12 @@ class WasherCoordinator:
             _door_closed(self.hass.states.get(self._door_id)),
             now,
         )
-        finished = self.learner.observe(previous, self.detector.state, power, now)
+        prelude = self.detector.take_prelude()
+        finished = self.learner.observe(
+            previous, self.detector.state, power, now, prelude
+        )
         match_before = self._match_key()
-        self._follow_cycle(previous, power, now)
+        self._follow_cycle(previous, power, now, prelude)
         self._schedule(now)
         if finished is not None:
             kind, name, samples = finished
@@ -259,10 +262,17 @@ class WasherCoordinator:
         self.learn_result = result
         self.learn_result_program = name
 
-    def _follow_cycle(self, previous, power, now):
+    def _follow_cycle(self, previous, power, now, prelude=()):
         state = self.detector.state
         if state == STATE_RUNNING and previous != STATE_RUNNING:
-            self._trace.start(now, power)
+            if prelude:
+                self._trace.start(prelude[0][0], prelude[0][1])
+                for moment, watts in prelude[1:]:
+                    self._trace.append(moment, watts)
+                if prelude[-1][0] != now and power is not None:
+                    self._trace.append(now, power)
+            else:
+                self._trace.start(now, power)
             self._match = None
             self._matched_at = None
             return
@@ -319,6 +329,8 @@ class WasherCoordinator:
         self._cancel_timer()
         self._schedule_match(now)
         end_at = self.detector.end_check_at
+        if end_at is None:
+            end_at = self.detector.confirm_check_at
         if end_at is None:
             return
         delay = end_at - now
