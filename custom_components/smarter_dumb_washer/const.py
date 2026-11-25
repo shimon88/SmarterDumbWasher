@@ -7,6 +7,21 @@ CONF_IDLE_THRESHOLD = "idle_power_threshold"
 CONF_END_DELAY = "end_delay"
 CONF_MIN_CYCLE = "min_cycle"
 CONF_DOOR_CLOSED_START = "door_closed_start"
+CONF_TTS_ENTITY = "tts_entity"
+CONF_MEDIA_PLAYERS = "media_players"
+CONF_NOTIFY_SERVICES = "notify_services"
+CONF_ANNOUNCE_MESSAGE = "announce_message"
+CONF_REPEAT_MINUTES = "repeat_minutes"
+CONF_QUIET_ENABLED = "quiet_enabled"
+CONF_QUIET_START = "quiet_start"
+CONF_QUIET_END = "quiet_end"
+
+DEFAULT_ANNOUNCE_MESSAGE = "The washer is done"
+DEFAULT_REPEAT_MINUTES = 10
+DEFAULT_QUIET_ENABLED = False
+DEFAULT_QUIET_START = "22:00:00"
+DEFAULT_QUIET_END = "07:00:00"
+MAX_ANNOUNCEMENTS = 6
 
 DEFAULT_START_THRESHOLD = 10.0
 DEFAULT_IDLE_THRESHOLD = 2.0

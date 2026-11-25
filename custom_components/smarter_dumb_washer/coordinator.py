@@ -24,6 +24,7 @@ from .const import (
     STATE_IDLE,
     STATE_RUNNING,
 )
+from .alerts import AlertManager
 from .config_flow import configured_data
 from .cycle_detector import CycleDetector
 from .learning import LearnSession
@@ -50,6 +51,7 @@ class WasherCoordinator:
         self._power_id = data[CONF_POWER_SENSOR]
         self._door_id = data[CONF_DOOR_SENSOR]
         self._idle_threshold = data[CONF_IDLE_THRESHOLD]
+        self.alerts = AlertManager(hass, entry, data)
         self.store = ProgramStore(hass, entry.entry_id)
         self.learner = LearnSession()
         self._trace = LiveTrace()
@@ -121,6 +123,7 @@ class WasherCoordinator:
             self._unsub_state = None
         self._cancel_timer()
         self._cancel_match_timer()
+        self.alerts.stop()
 
     def async_add_listener(self, listener):
         self._listeners.add(listener)
@@ -220,6 +223,10 @@ class WasherCoordinator:
         match_before = self._match_key()
         self._follow_cycle(previous, power, now, prelude)
         self._schedule(now)
+        if self.detector.state == STATE_FINISHED and previous != STATE_FINISHED:
+            self.alerts.finished()
+        elif previous == STATE_FINISHED and self.detector.state != STATE_FINISHED:
+            self.alerts.stop()
         if finished is not None:
             kind, name, samples = finished
             if kind == LEARN_TOO_SHORT:

@@ -3,10 +3,22 @@ from datetime import timedelta
 import pytest
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import (
+    async_fire_time_changed,
+    async_mock_service,
+)
 
 from custom_components.smarter_dumb_washer.const import (
     ATTR_ETA,
+    CONF_ANNOUNCE_MESSAGE,
+    CONF_MEDIA_PLAYERS,
+    CONF_NOTIFY_SERVICES,
+    CONF_QUIET_ENABLED,
+    CONF_QUIET_END,
+    CONF_QUIET_START,
+    CONF_REPEAT_MINUTES,
+    CONF_TTS_ENTITY,
     CONF_DOOR_CLOSED_START,
     CONF_END_DELAY,
     CONF_IDLE_THRESHOLD,
@@ -447,3 +459,169 @@ async def test_device_controls_learn_rename_delete(hass, washer_clock):
         "button", "press", {"entity_id": delete}, blocking=True
     )
     assert washer_attrs(hass, entry)[ATTR_PROGRAMS] == []
+
+
+def _alert_options(**overrides):
+    options = {
+        CONF_TTS_ENTITY: "tts.home",
+        CONF_MEDIA_PLAYERS: ["media_player.kitchen"],
+        CONF_NOTIFY_SERVICES: ["notify.phone"],
+        CONF_ANNOUNCE_MESSAGE: "Washer done",
+        CONF_REPEAT_MINUTES: 10,
+    }
+    options.update(overrides)
+    return options
+
+
+async def _advance(hass, clock, seconds):
+    clock.when += timedelta(seconds=seconds)
+    async_fire_time_changed(hass, clock.when)
+    await hass.async_block_till_done()
+
+
+async def test_finished_cycle_speaks_pushes_and_repeats_until_door_opens(
+    hass, washer_clock
+):
+    speak = async_mock_service(hass, "tts", "speak")
+    push = async_mock_service(hass, "notify", "phone")
+    entry = await setup_washer(hass, **_alert_options())
+
+    await play(hass, washer_clock, NORMAL)
+    assert washer_state(hass, entry) == STATE_FINISHED
+    assert len(push) == 1
+    assert push[0].data["message"] == "Washer done"
+    assert len(speak) == 1
+    assert speak[0].data["entity_id"] == "tts.home"
+    assert speak[0].data["media_player_entity_id"] == ["media_player.kitchen"]
+    assert speak[0].data["message"] == "Washer done"
+
+    await _advance(hass, washer_clock, 600)
+    assert len(speak) == 2
+    assert len(push) == 1
+
+    set_door(hass, False)
+    await hass.async_block_till_done()
+    assert washer_state(hass, entry) == STATE_IDLE
+
+    await _advance(hass, washer_clock, 600)
+    await _advance(hass, washer_clock, 600)
+    assert len(speak) == 2
+
+
+async def test_repeat_zero_speaks_once(hass, washer_clock):
+    speak = async_mock_service(hass, "tts", "speak")
+    entry = await setup_washer(hass, **_alert_options(repeat_minutes=0))
+
+    await play(hass, washer_clock, NORMAL)
+    assert washer_state(hass, entry) == STATE_FINISHED
+    await _advance(hass, washer_clock, 3600)
+
+    assert len(speak) == 1
+
+
+async def test_quiet_hours_push_now_and_speak_when_they_end(hass, washer_clock):
+    speak = async_mock_service(hass, "tts", "speak")
+    push = async_mock_service(hass, "notify", "phone")
+    local = dt_util.as_local(washer_clock.utcnow())
+    entry = await setup_washer(
+        hass,
+        **_alert_options(
+            quiet_enabled=True,
+            quiet_start=(local - timedelta(hours=1)).strftime("%H:%M:%S"),
+            quiet_end=(local + timedelta(hours=2)).strftime("%H:%M:%S"),
+        ),
+    )
+
+    await play(hass, washer_clock, NORMAL)
+    assert washer_state(hass, entry) == STATE_FINISHED
+    assert len(push) == 1
+    assert len(speak) == 0
+
+    await _advance(hass, washer_clock, 3 * 3600)
+    assert washer_state(hass, entry) == STATE_FINISHED
+    assert len(speak) == 1
+
+
+async def test_door_opened_during_quiet_hours_cancels_the_speech(hass, washer_clock):
+    speak = async_mock_service(hass, "tts", "speak")
+    local = dt_util.as_local(washer_clock.utcnow())
+    entry = await setup_washer(
+        hass,
+        **_alert_options(
+            quiet_enabled=True,
+            quiet_start=(local - timedelta(hours=1)).strftime("%H:%M:%S"),
+            quiet_end=(local + timedelta(hours=2)).strftime("%H:%M:%S"),
+        ),
+    )
+
+    await play(hass, washer_clock, NORMAL)
+    set_door(hass, False)
+    await hass.async_block_till_done()
+    assert washer_state(hass, entry) == STATE_IDLE
+
+    await _advance(hass, washer_clock, 3 * 3600)
+    assert len(speak) == 0
+
+
+async def test_no_alert_settings_means_no_calls(hass, washer_clock):
+    speak = async_mock_service(hass, "tts", "speak")
+    push = async_mock_service(hass, "notify", "phone")
+    entry = await setup_washer(hass)
+
+    await play(hass, washer_clock, NORMAL)
+    assert washer_state(hass, entry) == STATE_FINISHED
+
+    assert speak == []
+    assert push == []
+
+
+async def test_alert_options_are_validated_and_saved(hass, washer_clock):
+    entry = await setup_washer(hass)
+    base = {
+        CONF_START_THRESHOLD: 10,
+        CONF_IDLE_THRESHOLD: 2,
+        CONF_END_DELAY: 30,
+        CONF_MIN_CYCLE: 60,
+        CONF_DOOR_CLOSED_START: True,
+    }
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    rejected = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**base, CONF_TTS_ENTITY: "tts.home"}
+    )
+    assert rejected["errors"]["base"] == "tts_incomplete"
+
+    rejected = await hass.config_entries.options.async_configure(
+        rejected["flow_id"], {**base, CONF_NOTIFY_SERVICES: ["phone"]}
+    )
+    assert rejected["errors"]["base"] == "invalid_notify_service"
+
+    rejected = await hass.config_entries.options.async_configure(
+        rejected["flow_id"],
+        {
+            **base,
+            CONF_QUIET_ENABLED: True,
+            CONF_QUIET_START: "22:00:00",
+            CONF_QUIET_END: "22:00:00",
+        },
+    )
+    assert rejected["errors"]["base"] == "quiet_hours_empty"
+
+    saved = await hass.config_entries.options.async_configure(
+        rejected["flow_id"],
+        {
+            **base,
+            CONF_TTS_ENTITY: "tts.home",
+            CONF_MEDIA_PLAYERS: ["media_player.kitchen"],
+            CONF_NOTIFY_SERVICES: ["notify.phone"],
+            CONF_REPEAT_MINUTES: 5,
+            CONF_QUIET_ENABLED: False,
+        },
+    )
+    assert saved["type"] == FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert entry.options[CONF_TTS_ENTITY] == "tts.home"
+    assert entry.options[CONF_MEDIA_PLAYERS] == ["media_player.kitchen"]
+    assert entry.options[CONF_NOTIFY_SERVICES] == ["notify.phone"]
+    assert entry.options[CONF_REPEAT_MINUTES] == 5
+    assert entry.options[CONF_QUIET_ENABLED] is False

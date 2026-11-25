@@ -20,6 +20,18 @@ Settings → Devices & services → Add integration → **Smarter Dumb Washer**.
 
 Change those thresholds later under the device's **Configure** button. Saving reloads the device. A cycle already running starts its trace over.
 
+## Alerts
+
+Under the device's **Configure** button:
+
+- **Text-to-speech service** and **Speakers** — announce the message when State becomes `finished`. Set both or neither.
+- **Push notification services** — for example `notify.mobile_app_phone`. Sent once when the wash finishes.
+- **Message** — what is spoken and pushed.
+- **Repeat every** — minutes between spoken reminders until the door opens. `0` speaks once. Reminders stop after 6 announcements even if the door stays closed.
+- **Quiet hours** — no speech inside the window. Push notifications still arrive. If the door is still closed when quiet hours end, the announcement is spoken then.
+
+Opening the door, or starting another cycle, stops pending reminders.
+
 ## Sensors
 
 | Sensor | Values |
