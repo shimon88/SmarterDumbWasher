@@ -42,19 +42,38 @@
           "idle_power_threshold": "Idle power threshold",
           "end_delay": "End delay",
           "min_cycle": "Minimum cycle",
-          "door_closed_start": "Require door closed to start"
+          "door_closed_start": "Require door closed to start",
+          "tts_entity": "Text-to-speech service",
+          "media_players": "Speakers",
+          "notify_services": "Push notification services",
+          "announce_message": "Message",
+          "repeat_minutes": "Repeat every",
+          "quiet_enabled": "Use quiet hours",
+          "quiet_start": "Quiet hours start",
+          "quiet_end": "Quiet hours end"
         },
         "data_description": {
           "start_power_threshold": "A cycle starts when average power over 20 seconds reaches this value, or 20 W if this is lower",
           "idle_power_threshold": "Power below this value can end a cycle. Must be below the start threshold",
           "end_delay": "How long power must stay idle before the cycle ends",
           "min_cycle": "Shorter runs are ignored",
-          "door_closed_start": "A cycle starts only while the door is closed"
+          "door_closed_start": "A cycle starts only while the door is closed",
+          "tts_entity": "Speaks the message when the wash finishes. Needs speakers too",
+          "media_players": "Speakers that play the announcement",
+          "notify_services": "Notify services such as notify.mobile_app_phone. Sent when the wash finishes, also during quiet hours",
+          "announce_message": "Spoken and pushed when the wash finishes",
+          "repeat_minutes": "Minutes between spoken reminders until the door opens. 0 speaks once. Stops after 6 announcements",
+          "quiet_enabled": "No speech during quiet hours. Push notifications still arrive. Speech waits until quiet hours end if the door is still closed",
+          "quiet_start": "Quiet hours begin at this time",
+          "quiet_end": "Quiet hours end at this time"
         }
       }
     },
     "error": {
-      "idle_not_below_start": "Idle power threshold must be below the start power threshold."
+      "idle_not_below_start": "Idle power threshold must be below the start power threshold.",
+      "tts_incomplete": "Choose both a text-to-speech service and at least one speaker, or neither.",
+      "invalid_notify_service": "Each push service must look like notify.mobile_app_phone.",
+      "quiet_hours_empty": "Quiet hours start and end must be different."
     }
   },
   "services": {
